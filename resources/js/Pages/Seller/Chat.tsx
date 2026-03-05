@@ -1,122 +1,51 @@
 import React, { useState, useRef, useEffect } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import { 
-  Send, 
-  Search, 
-  Image as ImageIcon, 
-  Video, 
-  X 
-} from 'lucide-react';
+import { Send, Search } from 'lucide-react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 interface Message {
   id: number;
-  senderId: number;
-  text: string;
-  timestamp: string;
-  media?: Array<{
+  chat_id: number;
+  sender_id: number;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  sender: {
     id: number;
-    media_type: 'image' | 'video';
-    media_url: string;
-  }>;
+    first_name: string;
+    last_name: string;
+  };
 }
 
 interface Chat {
   id: number;
-  other_user: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    avatar?: string;
-  };
-  last_message?: {
-    message?: string;
-    media_type?: string;
-  };
+  customer_id: number;
+  store_id: number;
+  customer_name: string;
+  store_name: string;
+  last_message_at: string;
+  unread_count: number;
 }
 
-// Mock data
-const mockChats: Chat[] = [
-  {
-    id: 1,
-    other_user: {
-      id: 101,
-      first_name: 'Juan',
-      last_name: 'Dela Cruz',
-      avatar: 'https://i.pravatar.cc/150?img=1'
-    },
-    last_message: {
-      message: 'Is this product still available?'
-    }
-  },
-  {
-    id: 2,
-    other_user: {
-      id: 102,
-      first_name: 'Maria',
-      last_name: 'Santos',
-      avatar: 'https://i.pravatar.cc/150?img=2'
-    },
-    last_message: {
-      message: 'When will my order arrive?'
-    }
-  },
-  {
-    id: 3,
-    other_user: {
-      id: 103,
-      first_name: 'Jose',
-      last_name: 'Garcia',
-      avatar: 'https://i.pravatar.cc/150?img=3'
-    },
-    last_message: {
-      message: 'Thank you for the fast delivery!'
-    }
-  },
-];
+interface Props {
+  chats: Chat[];
+  stores: any[];
+}
 
-const mockMessages: Message[] = [
-  {
-    id: 1,
-    senderId: 101,
-    text: 'Hi! Is this product still available?',
-    timestamp: '2024-03-15T10:30:00'
-  },
-  {
-    id: 2,
-    senderId: 1, // seller
-    text: 'Yes, it is! We have 5 units in stock.',
-    timestamp: '2024-03-15T10:31:00'
-  },
-  {
-    id: 3,
-    senderId: 101,
-    text: 'Great! Can you ship to Quezon City?',
-    timestamp: '2024-03-15T10:32:00'
-  },
-  {
-    id: 4,
-    senderId: 1, // seller
-    text: 'Yes, we deliver to Quezon City. Shipping fee is ₱50.',
-    timestamp: '2024-03-15T10:33:00'
-  },
-];
-
-const CURRENT_USER_ID = 1; // seller ID
-
-export default function SellerChat() {
-  const [chats] = useState<Chat[]>(mockChats);
+export default function SellerChat({ chats: initialChats }: Props) {
+  const [chats, setChats] = useState<Chat[]>(initialChats);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const currentUserId = (window as any).Laravel?.user?.id;
 
   useEffect(() => {
     if (selectedChat) {
-      // Load messages for selected chat
-      setMessages(mockMessages);
-    } else {
-      setMessages([]);
+      loadMessages(selectedChat.id);
     }
   }, [selectedChat]);
 
@@ -124,51 +53,96 @@ export default function SellerChat() {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const loadMessages = async (chatId: number) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/seller/chats/${chatId}/messages`);
+      setMessages(response.data.messages || []);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+      toast.error('Failed to load messages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) return;
 
-    const message: Message = {
-      id: Date.now(),
-      senderId: CURRENT_USER_ID,
-      text: newMessage.trim(),
-      timestamp: new Date().toISOString()
-    };
+    try {
+      const response = await axios.post(`/api/seller/chats/${selectedChat.id}/messages`, {
+        message: newMessage.trim()
+      });
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+      if (response.data.success) {
+        setMessages(prev => [...prev, response.data.message]);
+        setNewMessage('');
+        
+        // Update chat's last message time
+        setChats(prev => prev.map(chat => 
+          chat.id === selectedChat.id 
+            ? { ...chat, last_message_at: new Date().toISOString() }
+            : chat
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast.error('Failed to send message');
+    }
   };
 
-  const renderLastMessage = (lastMessage?: Chat['last_message']) => {
-    if (!lastMessage) {
-      return 'No messages yet';
-    }
-    if (lastMessage.message) {
-      return lastMessage.message;
-    }
-    if (lastMessage.media_type) {
-      const isImage = lastMessage.media_type.startsWith('image');
-      return (
-        <span className="flex items-center gap-1">
-          {isImage ? <ImageIcon size={14} /> : <Video size={14} />}
-          {isImage ? 'Image' : 'Video'}
-        </span>
-      );
-    }
-    return '...';
-  };
-
-  const filteredChats = chats.filter(chat => {
-    const fullName = `${chat.other_user.first_name} ${chat.other_user.last_name}`.toLowerCase();
-    return fullName.includes(searchTerm.toLowerCase());
-  });
+  const filteredChats = chats.filter(chat => 
+    chat.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const formatDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const parseMessage = (messageText: string) => {
+    // Check if message contains product data
+    const productMatch = messageText.match(/\[PRODUCT\](.*?)\[\/PRODUCT\]/s);
+    if (productMatch) {
+      try {
+        const productData = JSON.parse(productMatch[1]);
+        const textBefore = messageText.substring(0, productMatch.index);
+        const textAfter = messageText.substring(productMatch.index! + productMatch[0].length);
+        
+        return {
+          hasProduct: true,
+          productData,
+          textBefore: textBefore.trim(),
+          textAfter: textAfter.trim()
+        };
+      } catch (e) {
+        return { hasProduct: false, text: messageText };
+      }
+    }
+    return { hasProduct: false, text: messageText };
   };
 
   return (
@@ -177,11 +151,12 @@ export default function SellerChat() {
         {/* Contact List */}
         <div className="w-1/3 border-r border-gray-200 flex flex-col bg-gray-50">
           <div className="p-4 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-800 mb-3">Messages</h2>
             <div className="relative">
               <Search className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search contacts..."
+                placeholder="Search customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -189,37 +164,40 @@ export default function SellerChat() {
             </div>
           </div>
           <div className="flex-grow overflow-y-auto">
-            {filteredChats.map(chat => (
-              <div
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
-                className={`p-3 flex items-center gap-4 cursor-pointer rounded-lg transition-colors ${
-                  selectedChat?.id === chat.id ? 'bg-primary/10' : 'hover:bg-gray-100'
-                }`}
-              >
-                <div className="relative">
-                  {chat.other_user.avatar ? (
-                    <img 
-                      src={chat.other_user.avatar}
-                      alt={`${chat.other_user.first_name} ${chat.other_user.last_name}`}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
-                      {getInitials(chat.other_user.first_name, chat.other_user.last_name)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-grow overflow-hidden">
-                  <span className="font-semibold text-gray-800">
-                    {`${chat.other_user.first_name} ${chat.other_user.last_name}`}
-                  </span>
-                  <p className="text-sm text-gray-500 truncate">
-                    {renderLastMessage(chat.last_message)}
-                  </p>
-                </div>
+            {filteredChats.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                {searchTerm ? 'No chats found' : 'No messages yet'}
               </div>
-            ))}
+            ) : (
+              filteredChats.map(chat => (
+                <div
+                  key={chat.id}
+                  onClick={() => setSelectedChat(chat)}
+                  className={`p-4 flex items-center gap-3 cursor-pointer border-b border-gray-100 transition-colors ${
+                    selectedChat?.id === chat.id ? 'bg-primary/10' : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
+                    {getInitials(chat.customer_name)}
+                  </div>
+                  <div className="flex-grow overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-800">
+                        {chat.customer_name}
+                      </span>
+                      {chat.unread_count > 0 && (
+                        <span className="bg-primary text-white text-xs rounded-full px-2 py-0.5 font-medium">
+                          {chat.unread_count}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatDate(chat.last_message_at)}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -229,78 +207,81 @@ export default function SellerChat() {
             <>
               {/* Chat Header */}
               <div className="p-4 border-b border-gray-200 flex items-center gap-4 bg-gray-50">
-                {selectedChat.other_user.avatar ? (
-                  <img 
-                    src={selectedChat.other_user.avatar}
-                    alt={`${selectedChat.other_user.first_name} ${selectedChat.other_user.last_name}`}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
-                    {getInitials(selectedChat.other_user.first_name, selectedChat.other_user.last_name)}
-                  </div>
-                )}
-                <h3 className="text-xl font-bold text-gray-800">
-                  {`${selectedChat.other_user.first_name} ${selectedChat.other_user.last_name}`}
-                </h3>
+                <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
+                  {getInitials(selectedChat.customer_name)}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {selectedChat.customer_name}
+                  </h3>
+                  <p className="text-sm text-gray-500">{selectedChat.store_name}</p>
+                </div>
               </div>
 
               {/* Message Area */}
               <div className="flex-grow p-6 overflow-y-auto bg-gray-100">
-                {messages.map(msg => (
-                  <div 
-                    key={msg.id} 
-                    className={`flex items-end gap-3 my-2 ${
-                      msg.senderId === CURRENT_USER_ID ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {msg.senderId !== CURRENT_USER_ID && selectedChat.other_user.avatar && (
-                      <img 
-                        src={selectedChat.other_user.avatar}
-                        alt="avatar"
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                    )}
-                    {msg.senderId !== CURRENT_USER_ID && !selectedChat.other_user.avatar && (
-                      <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                        {getInitials(selectedChat.other_user.first_name, selectedChat.other_user.last_name)}
-                      </div>
-                    )}
-                    <div 
-                      className={`px-4 py-2 rounded-2xl max-w-lg ${
-                        msg.senderId === CURRENT_USER_ID 
-                          ? 'bg-primary text-white rounded-br-none' 
-                          : 'bg-white text-gray-800 rounded-bl-none'
-                      }`}
-                    >
-                      {msg.text && <p>{msg.text}</p>}
-                      {msg.media && msg.media.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-2">
-                          {msg.media.map(mediaItem => (
-                            <div key={mediaItem.id}>
-                              {mediaItem.media_type === 'image' ? (
-                                <img 
-                                  src={mediaItem.media_url}
-                                  alt="attachment" 
-                                  className="rounded-md max-w-full" 
-                                />
-                              ) : (
-                                <video 
-                                  src={mediaItem.media_url}
-                                  controls 
-                                  className="rounded-md max-w-full" 
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-xs text-right mt-1 opacity-70">
-                        {formatTime(msg.timestamp)}
-                      </div>
-                    </div>
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                   </div>
-                ))}
+                ) : messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    No messages yet. Start the conversation!
+                  </div>
+                ) : (
+                  messages.map(msg => {
+                    const parsed = parseMessage(msg.message);
+                    const isSender = msg.sender_id === currentUserId;
+                    
+                    return (
+                      <div 
+                        key={msg.id} 
+                        className={`flex items-end gap-3 my-3 ${
+                          isSender ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        {!isSender && (
+                          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                            {getInitials(msg.sender.first_name + ' ' + msg.sender.last_name)}
+                          </div>
+                        )}
+                        <div 
+                          className={`px-4 py-2 rounded-2xl max-w-lg ${
+                            isSender 
+                              ? 'bg-primary text-white rounded-br-none' 
+                              : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
+                          }`}
+                        >
+                          {parsed.hasProduct ? (
+                            <>
+                              {parsed.textBefore && <p className="mb-2">{parsed.textBefore}</p>}
+                              <div className="bg-white/10 rounded-lg p-3 my-2">
+                                <div className="flex gap-3">
+                                  <img 
+                                    src={parsed.productData.image} 
+                                    alt={parsed.productData.name}
+                                    className="w-16 h-16 object-cover rounded"
+                                  />
+                                  <div className="flex-1">
+                                    <p className="font-semibold text-sm">{parsed.productData.name}</p>
+                                    <p className="text-sm opacity-90">₱{parsed.productData.price}</p>
+                                    <p className="text-xs opacity-75">{parsed.productData.stock} in stock</p>
+                                  </div>
+                                </div>
+                              </div>
+                              {parsed.textAfter && <p className="mt-2">{parsed.textAfter}</p>}
+                            </>
+                          ) : (
+                            <p>{parsed.text}</p>
+                          )}
+                          <div className={`text-xs text-right mt-1 ${isSender ? 'opacity-70' : 'text-gray-500'}`}>
+                            {formatTime(msg.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
                 <div ref={messageEndRef} />
               </div>
 
@@ -313,20 +294,12 @@ export default function SellerChat() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="w-full pr-28 pl-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-full pr-14 pl-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
                   />
-                  <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    <button className="p-2 text-gray-500 hover:text-primary">
-                      <ImageIcon size={20} />
-                    </button>
-                    <button className="p-2 text-gray-500 hover:text-primary">
-                      <Video size={20} />
-                    </button>
-                  </div>
                   <button 
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary-dark transition-colors disabled:bg-gray-400"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary-dark transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
                     <Send size={18} />
                   </button>
@@ -334,8 +307,12 @@ export default function SellerChat() {
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              Select a conversation to start chatting
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <Send size={40} className="text-gray-400" />
+              </div>
+              <p className="text-lg font-medium">Select a conversation</p>
+              <p className="text-sm">Choose a customer to start chatting</p>
             </div>
           )}
         </div>

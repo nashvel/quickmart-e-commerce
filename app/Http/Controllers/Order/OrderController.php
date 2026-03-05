@@ -219,4 +219,39 @@ class OrderController extends Controller
 
         return response()->json(['message' => 'Order cancelled']);
     }
+    
+    /**
+     * Track order page
+     */
+    public function track(Order $order)
+    {
+        // Ensure user owns this order
+        if ($order->customer_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Load order with items and products
+        $order->load(['items.product', 'address']);
+
+        // Format the order data for the frontend
+        $formattedOrder = [
+            'id' => $order->id,
+            'created_at' => $order->created_at->toISOString(),
+            'status' => $order->status,
+            'estimated_delivery_time' => null, // Add if you have this field
+            'items' => $order->items->map(function ($item) {
+                return [
+                    'name' => $item->product ? $item->product->name : 'Unknown Product',
+                    'quantity' => $item->quantity,
+                    'price' => $item->price,
+                ];
+            }),
+            'rider' => null, // Add rider data if available
+            'customer' => null, // Add customer location if available
+        ];
+
+        return Inertia::render('Orders/Track', [
+            'order' => $formattedOrder,
+        ]);
+    }
 }

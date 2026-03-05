@@ -81,74 +81,11 @@ Route::get('/pc-builder', function () {
 })->name('pc-builder.index');
 
 // Stores API
-Route::get('/api/stores', function () {
-    $type = request('type');
-    $stores = \App\Models\Store\Store::where('is_active', true);
-    
-    if ($type) {
-        $stores->where('store_type', $type);
-    }
-    
-    return response()->json($stores->get());
-});
-
-Route::get('/api/stores/{store}', function ($storeId) {
-    $store = \App\Models\Store\Store::where('is_active', true)->findOrFail($storeId);
-    return response()->json($store);
-});
+Route::get('/api/stores', [\App\Http\Controllers\Api\StoreApiController::class, 'index']);
+Route::get('/api/stores/{store}', [\App\Http\Controllers\Api\StoreApiController::class, 'show']);
 
 // Promotions API
-Route::get('/api/promotions/active', function () {
-    try {
-        // For now, return mock data since we don't have promotions table yet
-        $promotions = [
-            [
-                'id' => 1,
-                'title' => '50% Off Electronics',
-                'description' => 'Get 50% off on all electronics items',
-                'discount_type' => 'percentage',
-                'discount_value' => 50,
-                'scope_type' => 'category',
-                'scope_value' => 'Electronics',
-                'start_date' => now()->subDays(1)->toISOString(),
-                'end_date' => now()->addDays(30)->toISOString(),
-                'is_active' => true,
-                'image' => 'electronics-sale.jpg',
-            ],
-            [
-                'id' => 2,
-                'title' => 'Free Delivery',
-                'description' => 'Free delivery on orders above ₱500',
-                'discount_type' => 'fixed',
-                'discount_value' => 0,
-                'scope_type' => 'all_products',
-                'scope_value' => null,
-                'start_date' => now()->subDays(5)->toISOString(),
-                'end_date' => now()->addDays(15)->toISOString(),
-                'is_active' => true,
-                'image' => 'free-delivery.jpg',
-            ],
-            [
-                'id' => 3,
-                'title' => 'Buy 2 Get 1 Free',
-                'description' => 'Buy 2 items and get 1 free on selected products',
-                'discount_type' => 'fixed',
-                'discount_value' => 0,
-                'scope_type' => 'store',
-                'scope_value' => 'Tech World',
-                'start_date' => now()->subDays(2)->toISOString(),
-                'end_date' => now()->addDays(20)->toISOString(),
-                'is_active' => true,
-                'image' => 'buy2get1.jpg',
-            ],
-        ];
-        
-        return response()->json(['promotions' => $promotions]);
-    } catch (\Exception $e) {
-        \Log::error('Promotions API error: ' . $e->getMessage());
-        return response()->json(['promotions' => []], 200);
-    }
-});
+Route::get('/api/promotions/active', [\App\Http\Controllers\Api\PromotionApiController::class, 'active']);
 
 // Cart (public - guests can add to cart)
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
@@ -159,66 +96,34 @@ Route::put('/api/cart/{cartItem}', [CartController::class, 'update']);
 Route::delete('/api/cart/{cartItem}', [CartController::class, 'destroy']);
 Route::delete('/api/cart', [CartController::class, 'clear']);
 
+// Chat API (requires auth)
+// Chat API (requires auth)
+Route::middleware('auth')->group(function () {
+    // Customer chat endpoints
+    Route::get('/api/chats', [\App\Http\Controllers\ChatController::class, 'index']);
+    Route::get('/api/chats/{store}/create', [\App\Http\Controllers\ChatController::class, 'getOrCreate']);
+    Route::get('/api/chats/{chat}/messages', [\App\Http\Controllers\ChatController::class, 'messages']);
+    Route::post('/api/chats/{chat}/messages', [\App\Http\Controllers\ChatController::class, 'sendMessage']);
+    Route::delete('/api/chats/{chat}', [\App\Http\Controllers\ChatController::class, 'destroy']);
+    
+    // Seller chat endpoints
+    Route::prefix('api/seller')->name('api.seller.')->group(function () {
+        Route::get('/chats', [\App\Http\Controllers\Seller\SellerChatController::class, 'index']);
+        Route::get('/chats/{chat}/messages', [\App\Http\Controllers\Seller\SellerChatController::class, 'messages']);
+        Route::post('/chats/{chat}/messages', [\App\Http\Controllers\Seller\SellerChatController::class, 'sendMessage']);
+    });
+});
+
 // Protected routes
 Route::middleware('auth')->group(function () {
-    // Checkout (requires auth)
-    Route::get('/checkout', function () {
-        $addresses = auth()->user()->addresses()->orderBy('is_default', 'desc')->get()->map(function ($address) {
-            return [
-                'id' => $address->id,
-                'name' => $address->name,
-                'address_line' => $address->address_line_1, // For backward compatibility
-                'address_line_1' => $address->address_line_1,
-                'address_line_2' => $address->address_line_2,
-                'city' => $address->city,
-                'province' => $address->province,
-                'postal_code' => $address->postal_code,
-                'type' => $address->type,
-                'latitude' => $address->latitude,
-                'longitude' => $address->longitude,
-                'is_default' => $address->is_default,
-            ];
-        });
-        
-        return Inertia::render('Checkout/Index', [
-            'addresses' => $addresses,
-        ]);
-    })->name('checkout');
-    
-    // Checkout API
+    // Checkout
+    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout');
     Route::post('/api/checkout', [CheckoutController::class, 'processCheckout']);
     
     // Orders
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
-    Route::get('/track-order/{order}', function (Order $order) {
-        // Ensure user owns this order
-        if ($order->customer_id !== auth()->id()) {
-            abort(403);
-        }
-
-        // Load order with items and products
-        $order->load(['items.product', 'address']);
-
-        // Format the order data for the frontend
-        $formattedOrder = [
-            'id' => $order->id,
-            'created_at' => $order->created_at->toISOString(),
-            'status' => $order->status,
-            'estimated_delivery_time' => null, // Add if you have this field
-            'items' => $order->items->map(function ($item) {
-                return [
-                    'name' => $item->product ? $item->product->name : 'Unknown Product',
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
-                ];
-            }),
-            'rider' => null, // Add rider data if available
-            'customer' => null, // Add customer location if available
-        ];
-
-        return Inertia::render('Orders/Track', ['order' => $formattedOrder]);
-    })->name('orders.track');
+    Route::get('/track-order/{order}', [OrderController::class, 'track'])->name('orders.track');
     Route::get('/order-success', function () {
         return Inertia::render('Orders/Success');
     })->name('orders.success');
@@ -253,6 +158,14 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('Profile/PaymentMethods');
     })->name('profile.payment-methods');
     
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/api/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::get('/api/notifications/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount']);
+    Route::post('/api/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::post('/api/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/api/notifications/{notification}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
+    
     // Chat
     Route::get('/chat', function () {
         return Inertia::render('Chat/Index');
@@ -271,14 +184,14 @@ Route::middleware('auth')->group(function () {
         })->name('products.add');
         
         Route::get('/orders', [\App\Http\Controllers\Seller\SellerController::class, 'orders'])->name('orders');
+        Route::post('/orders/{order}/accept', [\App\Http\Controllers\Seller\SellerController::class, 'acceptOrder'])->name('orders.accept');
+        Route::post('/orders/{order}/decline', [\App\Http\Controllers\Seller\SellerController::class, 'declineOrder'])->name('orders.decline');
         
         Route::get('/reviews', function () {
             return Inertia::render('Seller/Reviews');
         })->name('reviews');
         
-        Route::get('/chat', function () {
-            return Inertia::render('Seller/Chat');
-        })->name('chat');
+        Route::get('/chat', [\App\Http\Controllers\Seller\SellerController::class, 'chat'])->name('chat');
         
         Route::get('/manage-store', function () {
             return Inertia::render('Seller/ManageStore');

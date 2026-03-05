@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
+import { getProductImageUrl, ASSET_URLS } from '@/config/assets';
 import { 
   Plus, 
   Package, 
@@ -166,9 +167,12 @@ const ProductListItem = ({ product, onSelect, onDelete, isSelected }: ProductLis
         {/* Product Image */}
         <div className="col-span-2 flex items-center">
           <img 
-            src={`https://via.placeholder.com/80?text=${product.name.substring(0, 2)}`}
+            src={getProductImageUrl(product.image)}
             alt={product.name} 
-            className="w-16 h-16 object-cover rounded-md" 
+            className="w-16 h-16 object-cover rounded-md"
+            onError={(e) => {
+              e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
+            }}
           />
         </div>
 
@@ -261,9 +265,12 @@ const ProductListItem = ({ product, onSelect, onDelete, isSelected }: ProductLis
                   <div>{variant.stock}</div>
                   <div>
                     <img 
-                      src={`https://via.placeholder.com/48?text=${getAttribute(variant, 'Color').substring(0, 1)}`}
+                      src={getProductImageUrl(variant.image || product.image)}
                       alt={`${product.name} - ${getAttribute(variant, 'Color')}`}
                       className="w-12 h-12 object-cover rounded-md border"
+                      onError={(e) => {
+                        e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
+                      }}
                     />
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FaStar, FaHeart } from 'react-icons/fa';
+import { getStoreImageUrl, ASSET_URLS } from '../../../config/assets';
 
 const RestaurantCard = ({ 
   restaurant, 
@@ -22,9 +23,12 @@ const RestaurantCard = ({
     >
       <div className="relative">
         <img 
-          src={restaurant.logo || 'https://via.placeholder.com/400x225'}
+          src={getStoreImageUrl(restaurant.logo)}
           alt={restaurant.name}
           className={`w-full h-40 object-cover transition-transform duration-300 group-hover:scale-105 ${isUnavailable ? 'filter grayscale' : ''}`}
+          onError={(e) => {
+            e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.STORE;
+          }}
         />
         {isUnavailable && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">

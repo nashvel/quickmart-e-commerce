@@ -186,47 +186,6 @@ export default function ProductsIndex(): JSX.Element {
                 className="bg-gray-50 min-h-screen"
             >
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {/* Active Filters */}
-                    {activeFilters.length > 0 && (
-                        <div className="mb-6">
-                            <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                <AnimatePresence>
-                                    {activeFilters.map(filter => (
-                                        <motion.span
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.8 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.8 }}
-                                            transition={{
-                                                opacity: { duration: 0.15 },
-                                                scale: { duration: 0.15 },
-                                                layout: { duration: 0.2, ease: 'easeInOut' }
-                                            }}
-                                            key={filter.key}
-                                            className="bg-blue-100 text-primary font-semibold px-3 py-1.5 rounded-full text-sm flex items-center shadow-sm flex-shrink-0"
-                                        >
-                                            {filter.label}
-                                            <button 
-                                                onClick={() => removeFilter(filter)} 
-                                                className="ml-2 text-primary hover:bg-blue-200 rounded-full p-0.5"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </motion.span>
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                            <div className="flex justify-end">
-                                <button 
-                                    onClick={clearAllFilters} 
-                                    className="text-sm text-primary hover:underline font-semibold"
-                                >
-                                    Clear All Filters
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     <div className="flex gap-8">
                         {/* Sidebar */}
                         <aside className="hidden lg:block w-64 flex-shrink-0">
@@ -382,14 +341,43 @@ export default function ProductsIndex(): JSX.Element {
                                 ) : (
                                     <div className="flex flex-col md:flex-row items-center gap-4">
                                         <form onSubmit={handleSearchSubmit} className="relative flex-grow w-full">
-                                            <Search className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                                            <input
-                                                type="text"
-                                                placeholder="Search products..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="w-full bg-white border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-primary pl-12 pr-4 py-3 shadow-sm"
-                                            />
+                                            <Search className="absolute top-3 left-4 text-gray-400 pointer-events-none" size={20} />
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-primary shadow-sm min-h-[52px] flex flex-wrap items-center gap-2 pl-12 pr-4 py-2">
+                                                {/* Active Filters inside search bar */}
+                                                <AnimatePresence>
+                                                    {activeFilters.map(filter => (
+                                                        <motion.span
+                                                            layout
+                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.8 }}
+                                                            transition={{
+                                                                opacity: { duration: 0.15 },
+                                                                scale: { duration: 0.15 },
+                                                                layout: { duration: 0.2, ease: 'easeInOut' }
+                                                            }}
+                                                            key={filter.key}
+                                                            className="bg-blue-100 text-primary font-semibold px-2.5 py-1 rounded-full text-xs flex items-center shadow-sm flex-shrink-0"
+                                                        >
+                                                            {filter.label}
+                                                            <button 
+                                                                onClick={() => removeFilter(filter)} 
+                                                                className="ml-1.5 text-primary hover:bg-blue-200 rounded-full p-0.5"
+                                                                type="button"
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        </motion.span>
+                                                    ))}
+                                                </AnimatePresence>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search products..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                    className="flex-1 min-w-[120px] bg-transparent border-none focus:outline-none focus:ring-0 p-1"
+                                                />
+                                            </div>
                                         </form>
                                         <div className="w-full md:w-auto flex-shrink-0">
                                             <select 

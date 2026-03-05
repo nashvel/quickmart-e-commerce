@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaTimes, FaPlus, FaMinus, FaShoppingCart, FaUtensils, FaCoffee, FaCookie, FaEllipsisH, FaChevronDown } from 'react-icons/fa';
 import api from '../../../api/axios-config';
-import { PRODUCT_ASSET_URL, ADDON_ASSET_URL } from '../../../config';
+import { getProductImageUrl, ASSET_URLS } from '../../../config/assets';
 
 const AddOnsModal = ({ 
   isOpen, 
@@ -178,9 +178,12 @@ const AddOnsModal = ({
             </button>
             <div className="flex items-center gap-4">
               <img
-                src={product?.image ? `${PRODUCT_ASSET_URL}/${product.image}` : 'https://via.placeholder.com/80x80'}
+                src={getProductImageUrl(product?.image)}
                 alt={product?.name}
                 className="w-16 h-16 rounded-lg object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
+                }}
               />
               <div>
                 <h2 className="text-xl font-bold">{product?.name}</h2>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 import { Star } from 'lucide-react';
+import { getProductImageUrl, ASSET_URLS } from '@/config/assets';
 
 interface Review {
   id: number;
@@ -176,9 +177,12 @@ export default function SellerReviews() {
             <div key={product.id} className="mb-10">
               <div className="flex items-center gap-5 mb-5 pb-5 border-b border-gray-200">
                 <img 
-                  src={`https://via.placeholder.com/80?text=${product.name.substring(0, 2)}`}
+                  src={getProductImageUrl(product.image)}
                   alt={product.name} 
-                  className="w-20 h-20 rounded-lg object-cover" 
+                  className="w-20 h-20 rounded-lg object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
+                  }}
                 />
                 <div>
                   <h3 className="text-xl font-bold text-gray-800">{product.name}</h3>

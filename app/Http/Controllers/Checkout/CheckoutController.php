@@ -9,9 +9,41 @@ use App\Models\Order\OrderItem;
 use App\Models\Address\Address;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class CheckoutController extends Controller
 {
+    /**
+     * Show checkout page
+     */
+    public function index(Request $request)
+    {
+        $addresses = $request->user()
+            ->addresses()
+            ->orderBy('is_default', 'desc')
+            ->get()
+            ->map(function ($address) {
+                return [
+                    'id' => $address->id,
+                    'name' => $address->name,
+                    'address_line' => $address->address_line_1, // For backward compatibility
+                    'address_line_1' => $address->address_line_1,
+                    'address_line_2' => $address->address_line_2,
+                    'city' => $address->city,
+                    'province' => $address->province,
+                    'postal_code' => $address->postal_code,
+                    'type' => $address->type,
+                    'latitude' => $address->latitude,
+                    'longitude' => $address->longitude,
+                    'is_default' => $address->is_default,
+                ];
+            });
+        
+        return Inertia::render('Checkout/Index', [
+            'addresses' => $addresses,
+        ]);
+    }
+    
     /**
      * Process checkout and create order
      */

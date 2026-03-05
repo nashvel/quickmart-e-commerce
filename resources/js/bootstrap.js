@@ -9,7 +9,6 @@ const setCSRFToken = () => {
     const token = document.head.querySelector('meta[name="csrf-token"]');
     if (token) {
         window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
-        console.log('CSRF token set:', token.content.substring(0, 10) + '...');
         return token.content;
     } else {
         console.error('CSRF token not found: https://laravel.com/docs/csrf#csrf-x-csrf-token');
@@ -56,7 +55,6 @@ document.addEventListener('inertia:success', (event) => {
             metaTag.setAttribute('content', page.props.csrf_token);
         }
         window.axios.defaults.headers.common['X-CSRF-TOKEN'] = page.props.csrf_token;
-        console.log('CSRF token updated via Inertia:', page.props.csrf_token.substring(0, 10) + '...');
     }
 });
 

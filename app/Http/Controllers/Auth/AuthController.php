@@ -74,16 +74,26 @@ class AuthController extends Controller
             
             // Merge guest cart with user cart
             $this->mergeGuestCart($request);
+            
+            $user = Auth::user();
 
             // Return JSON response for AJAX requests
             if ($request->expectsJson()) {
-                $user = Auth::user();
                 return response()->json([
                     'success' => true,
                     'message' => 'Login successful!',
                     'user' => $user,
                     'token' => $user->createToken('auth-token')->plainTextToken
                 ], 200);
+            }
+
+            // Redirect based on user role
+            if ($user->role === 'admin') {
+                return redirect()->route('admin.dashboard')->with('success', 'Welcome back, Admin!');
+            } elseif ($user->role === 'client') {
+                return redirect()->route('seller.dashboard')->with('success', 'Welcome back!');
+            } elseif ($user->role === 'rider') {
+                return redirect()->route('rider.dashboard')->with('success', 'Welcome back!');
             }
 
             return redirect()->intended('/')->with('success', 'Welcome back!');

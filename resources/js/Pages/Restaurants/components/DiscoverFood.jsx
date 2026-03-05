@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { PRODUCT_ASSET_URL } from '../../../config';
+import { getProductImageUrl, ASSET_URLS } from '../../../config/assets';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import AddOnsModal from './AddOnsModal';
 
@@ -21,9 +21,12 @@ const FoodItemCard = ({ food, restaurants, handleViewMenu, handleAddToCart, onSh
   >
     <div className="relative">
       <img
-        src={food.image ? `${PRODUCT_ASSET_URL}/${food.image}` : 'https://via.placeholder.com/300x200'}
+        src={getProductImageUrl(food.image)}
         alt={food.name}
         className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+        onError={(e) => {
+          e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
+        }}
       />
       <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-700">
         {food.restaurantName}

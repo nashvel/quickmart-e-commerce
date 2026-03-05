@@ -54,14 +54,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 updated[existingIndex].quantity += item.quantity;
                 toast.success(`Updated ${item.name} quantity in cart!`, {
                     duration: 2000,
-                    position: 'top-right',
+                    position: 'bottom-right',
                 });
                 return updated;
             } else {
                 // Add new item
                 toast.success(`${item.name} added to cart!`, {
                     duration: 2000,
-                    position: 'top-right',
+                    position: 'bottom-right',
                 });
                 return [...prev, item];
             }
@@ -75,7 +75,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             );
             toast.success('Item removed from cart', {
                 duration: 2000,
-                position: 'top-right',
+                position: 'bottom-right',
             });
             return filtered;
         });
@@ -97,7 +97,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('cart');
         toast.success('Cart cleared', {
             duration: 2000,
-            position: 'top-right',
+            position: 'bottom-right',
         });
     };
 

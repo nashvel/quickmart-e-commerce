@@ -6,6 +6,8 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { Toaster } from 'react-hot-toast';
 import { CartProvider } from './contexts/CartContext';
+import { StoreProvider } from './context/StoreContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 const appName = (import.meta as any).env?.VITE_APP_NAME || 'QuickMart';
 
@@ -20,10 +22,14 @@ createInertiaApp({
         const root = createRoot(el);
 
         root.render(
-            <CartProvider>
-                <App {...props} />
-                <Toaster position="top-right" />
-            </CartProvider>
+            <StoreProvider>
+                <NotificationProvider>
+                    <CartProvider>
+                        <App {...props} />
+                        <Toaster position="bottom-right" />
+                    </CartProvider>
+                </NotificationProvider>
+            </StoreProvider>
         );
     },
     progress: {

@@ -64,8 +64,108 @@ class SellerController extends Controller
                 ];
             });
 
-        return Inertia::render('Seller/Orders', [
+        return Inertia::render('Seller/Orders/Index', [
             'orders' => $orders
+        ]);
+    }
+
+    /**
+     * Show seller chats
+     */
+    public function chat()
+    {
+        $userId = Auth::id();
+        
+        // Get the seller's store(s)
+        $stores = Store::where('client_id', $userId)->get();
+        $storeIds = $stores->pluck('id');
+        
+        // Get chats for the seller's stores
+        $chats = \App\Models\Chat\Chat::whereIn('store_id', $storeIds)
+            ->with(['customer:id,first_name,last_name', 'store:id,name'])
+            ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                $query->where('sender_id', '!=', $userId)
+                    ->where('is_read', false);
+            }])
+            ->orderBy('last_message_at', 'desc')
+            ->get()
+            ->map(function ($chat) {
+                return [
+                    'id' => $chat->id,
+                    'customer_id' => $chat->customer_id,
+                    'store_id' => $chat->store_id,
+                    'customer_name' => $chat->customer 
+                        ? $chat->customer->first_name . ' ' . $chat->customer->last_name 
+                        : 'Unknown Customer',
+                    'store_name' => $chat->store ? $chat->store->name : 'Unknown Store',
+                    'last_message_at' => $chat->last_message_at,
+                    'unread_count' => $chat->unread_count ?? 0,
+                ];
+            });
+
+        return Inertia::render('Seller/Chat', [
+            'chats' => $chats,
+            'stores' => $stores
+        ]);
+    }
+    
+    /**
+     * Accept an order
+     */
+    public function acceptOrder(Request $request, Order $order)
+    {
+        $userId = Auth::id();
+        
+        // Verify seller owns the store
+        $store = Store::where('client_id', $userId)
+            ->where('id', $order->store_id)
+            ->first();
+        
+        if (!$store) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        // Only accept pending orders
+        if ($order->status !== 'pending') {
+            return response()->json(['message' => 'Order cannot be accepted'], 400);
+        }
+        
+        $order->update(['status' => 'accepted']);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Order accepted successfully',
+            'order' => $order
+        ]);
+    }
+    
+    /**
+     * Decline an order
+     */
+    public function declineOrder(Request $request, Order $order)
+    {
+        $userId = Auth::id();
+        
+        // Verify seller owns the store
+        $store = Store::where('client_id', $userId)
+            ->where('id', $order->store_id)
+            ->first();
+        
+        if (!$store) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        // Only decline pending orders
+        if ($order->status !== 'pending') {
+            return response()->json(['message' => 'Order cannot be declined'], 400);
+        }
+        
+        $order->update(['status' => 'rejected']);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Order declined',
+            'order' => $order
         ]);
     }
 }

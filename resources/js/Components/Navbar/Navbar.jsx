@@ -337,7 +337,7 @@ const Navbar = () => {
             </div>
 
             {/* Icons */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-2">
               {user && (
                 <>
                   <div className="relative" ref={notificationsRef}>
@@ -376,17 +376,16 @@ const Navbar = () => {
                   )}
                 </>
               )}
-              <Link to="/wishlist" className="p-2 rounded-full text-primary hover:bg-blue-50" aria-label="View your wishlist">
+              <Link to="/wishlist" className="relative p-2 rounded-full text-primary hover:bg-blue-50 transition-colors" aria-label="View your wishlist">
                 <FaHeart size={22} />
               </Link>
-              <Link to={user ? "/profile/settings" : "/login"} className="p-2 rounded-full text-primary hover:bg-blue-50" aria-label={user ? "View your profile" : "Sign in"}>
+              <Link to={user ? "/profile/settings" : "/login"} className="relative p-2 rounded-full text-primary hover:bg-blue-50 transition-colors" aria-label={user ? "View your profile" : "Sign in"}>
                 <FaUser size={22} />
               </Link>
-
-              <Link to="/cart" className="relative p-2 rounded-full text-primary hover:bg-blue-50" aria-label="View your shopping cart">
+              <Link to="/cart" className="relative p-2 rounded-full text-primary hover:bg-blue-50 transition-colors" aria-label="View your shopping cart">
                 <FaShoppingCart size={22} />
                 {cartCount > 0 && (
-                  <span className="absolute top-0 right-0 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">{cartCount}</span>
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-sm">{cartCount}</span>
                 )}
               </Link>
             </div>

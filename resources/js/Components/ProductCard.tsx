@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
 import { Star, Heart, Eye, Store, Tag } from 'lucide-react';
-
-const PRODUCT_ASSET_URL = '/storage/products';
+import { getProductImageUrl, ASSET_URLS } from '@/config/assets';
 
 interface Product {
     id: number;
@@ -156,15 +155,11 @@ export default function ProductCard({ product, size = 'normal' }: Props) {
                             className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${
                                 imageLoaded ? 'opacity-100' : 'opacity-0'
                             }`}
-                            src={`${PRODUCT_ASSET_URL}/${image || 'default.png'}`}
+                            src={getProductImageUrl(image)}
                             alt={name}
                             onLoad={() => setImageLoaded(true)}
                             onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                if (!target.dataset.errorHandled) {
-                                    target.dataset.errorHandled = 'true';
-                                    target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"%3E%3Crect fill="%23f3f4f6" width="300" height="300"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="24" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                }
+                                e.currentTarget.src = ASSET_URLS.PLACEHOLDERS.PRODUCT;
                                 setImageLoaded(true);
                             }}
                         />
