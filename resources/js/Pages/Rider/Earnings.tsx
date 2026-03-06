@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 import { 
   DollarSign, 
@@ -18,71 +18,34 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// Mock data
-const weeklyEarnings = [
-  { day: 'Mon', earnings: 1250 },
-  { day: 'Tue', earnings: 1500 },
-  { day: 'Wed', earnings: 980 },
-  { day: 'Thu', earnings: 1780 },
-  { day: 'Fri', earnings: 2100 },
-  { day: 'Sat', earnings: 2500 },
-  { day: 'Sun', earnings: 1890 },
-];
-
-const monthlyEarnings = [
-  { month: 'Jan', earnings: 25000 },
-  { month: 'Feb', earnings: 28000 },
-  { month: 'Mar', earnings: 32000 },
-  { month: 'Apr', earnings: 30000 },
-  { month: 'May', earnings: 35000 },
-  { month: 'Jun', earnings: 38000 },
-];
-
 interface Transaction {
   id: number;
   date: string;
   order_id: number;
   amount: number;
   type: 'delivery' | 'bonus' | 'withdrawal';
+  customer_name: string;
+  store_name: string;
 }
 
-const mockTransactions: Transaction[] = [
-  {
-    id: 1,
-    date: '2024-03-15T10:30:00',
-    order_id: 1001,
-    amount: 150,
-    type: 'delivery'
-  },
-  {
-    id: 2,
-    date: '2024-03-15T14:45:00',
-    order_id: 1002,
-    amount: 120,
-    type: 'delivery'
-  },
-  {
-    id: 3,
-    date: '2024-03-14T09:20:00',
-    order_id: 1003,
-    amount: 200,
-    type: 'delivery'
-  },
-  {
-    id: 4,
-    date: '2024-03-14T11:00:00',
-    order_id: 0,
-    amount: 500,
-    type: 'bonus'
-  },
-  {
-    id: 5,
-    date: '2024-03-13T16:30:00',
-    order_id: 0,
-    amount: -5000,
-    type: 'withdrawal'
-  },
-];
+interface WeeklyData {
+  day: string;
+  earnings: number;
+}
+
+interface MonthlyData {
+  month: string;
+  earnings: number;
+}
+
+interface Props {
+  transactions: Transaction[];
+  totalEarnings: number;
+  availableBalance: number;
+  weeklyEarnings: WeeklyData[];
+  monthlyEarnings: MonthlyData[];
+  thisWeekEarnings: number;
+}
 
 interface StatCardProps {
   title: string;
@@ -111,16 +74,17 @@ const StatCard = ({ title, value, icon, trend }: StatCardProps) => (
   </div>
 );
 
-export default function RiderEarnings() {
-  const [transactions] = useState<Transaction[]>(mockTransactions);
+export default function RiderEarnings({ 
+  transactions: initialTransactions,
+  totalEarnings,
+  availableBalance,
+  weeklyEarnings,
+  monthlyEarnings,
+  thisWeekEarnings
+}: Props) {
+  const [transactions] = useState<Transaction[]>(initialTransactions);
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
-
-  const totalEarnings = transactions
-    .filter(t => t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const availableBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   const chartData = period === 'weekly' ? weeklyEarnings : monthlyEarnings;
 
@@ -154,7 +118,6 @@ export default function RiderEarnings() {
             title="Total Earnings"
             value={`₱${totalEarnings.toLocaleString()}`}
             icon={<DollarSign className="text-blue-600" size={24} />}
-            trend="+15% from last month"
           />
           <StatCard
             title="Available Balance"
@@ -163,9 +126,8 @@ export default function RiderEarnings() {
           />
           <StatCard
             title="This Week"
-            value={`₱${weeklyEarnings.reduce((sum, d) => sum + d.earnings, 0).toLocaleString()}`}
+            value={`₱${thisWeekEarnings.toLocaleString()}`}
             icon={<Calendar className="text-blue-600" size={24} />}
-            trend="+8% from last week"
           />
         </div>
 
@@ -262,6 +224,11 @@ export default function RiderEarnings() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getTransactionLabel(transaction)}
+                      {transaction.type === 'delivery' && (
+                        <div className="text-xs text-gray-500">
+                          {transaction.customer_name} • {transaction.store_name}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${

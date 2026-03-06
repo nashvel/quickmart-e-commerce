@@ -21,7 +21,15 @@ export interface Order {
   zip_code: string;
   latitude?: number;
   longitude?: number;
-  rider_first_name?: string;
-  rider_last_name?: string;
+  rider_id?: number | null;
+  rider_first_name?: string | null;
+  rider_last_name?: string | null;
   items: OrderItem[];
+}
+
+export interface Rider {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
 }

@@ -1,23 +1,27 @@
 import { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import { Order } from '@/types/order';
+import { Order, Rider } from '@/types/order';
 import { TabButton } from './components/TabButton';
 import { OrderRow } from './components/OrderRow';
 import { Pagination } from './components/Pagination';
+import { RiderAssignmentModal } from './components/RiderAssignmentModal';
 
 interface Props {
   orders: Order[];
+  riders: Rider[];
 }
 
-export default function SellerOrders({ orders: initialOrders }: Props) {
-  const [activeTab, setActiveTab] = useState<'incoming' | 'transactions'>('incoming');
+export default function SellerOrders({ orders: initialOrders, riders }: Props) {
+  const [activeTab, setActiveTab] = useState<'incoming' | 'assign-rider' | 'transactions'>('incoming');
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedOrderForAssignment, setSelectedOrderForAssignment] = useState<Order | null>(null);
   const itemsPerPage = 20;
 
-  const handleTabChange = (tab: 'incoming' | 'transactions') => {
+  const handleTabChange = (tab: 'incoming' | 'assign-rider' | 'transactions') => {
     setActiveTab(tab);
     setCurrentPage(1);
   };
@@ -43,6 +47,8 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
         setOrders(prev => prev.map(order => 
           order.id === orderId ? { ...order, status: 'accepted' as const } : order
         ));
+        // Auto-switch to assign rider tab
+        setActiveTab('assign-rider');
       }
     } catch (error) {
       console.error('Failed to accept order:', error);
@@ -76,6 +82,42 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
     }
   };
 
+  const handleOpenAssignModal = (order: Order) => {
+    setSelectedOrderForAssignment(order);
+    setAssignModalOpen(true);
+  };
+
+  const handleAssignRider = async (orderId: number, riderId: number) => {
+    try {
+      const response = await fetch(`/seller/orders/${orderId}/assign-rider`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify({ rider_id: riderId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const assignedRider = riders.find(r => r.id === riderId);
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { 
+            ...order, 
+            status: 'in_transit' as const,
+            rider_id: riderId,
+            rider_first_name: assignedRider?.first_name || null,
+            rider_last_name: assignedRider?.last_name || null
+          } : order
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to assign rider:', error);
+      throw error;
+    }
+  };
+
   const handleGetDirections = (order: Order) => {
     if (order.latitude && order.longitude) {
       window.open(
@@ -90,12 +132,25 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
   };
 
   const incomingOrders = orders.filter(order => order.status === 'pending');
+  const assignRiderOrders = orders.filter(order => order.status === 'accepted' && !order.rider_id);
   const transactionOrders = orders.filter(
-    order => order.status !== 'pending' && order.status !== 'rejected'
+    order => order.status === 'in_transit' || order.status === 'delivered'
   );
 
-  const activeOrders = activeTab === 'incoming' ? incomingOrders : transactionOrders;
+  const getActiveOrders = () => {
+    switch (activeTab) {
+      case 'incoming':
+        return incomingOrders;
+      case 'assign-rider':
+        return assignRiderOrders;
+      case 'transactions':
+        return transactionOrders;
+      default:
+        return [];
+    }
+  };
 
+  const activeOrders = getActiveOrders();
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = activeOrders.slice(indexOfFirstItem, indexOfLastItem);
@@ -117,6 +172,12 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
               count={incomingOrders.length}
               isActive={activeTab === 'incoming'}
               onClick={() => handleTabChange('incoming')}
+            />
+            <TabButton
+              label="Assign Rider"
+              count={assignRiderOrders.length}
+              isActive={activeTab === 'assign-rider'}
+              onClick={() => handleTabChange('assign-rider')}
             />
             <TabButton
               label="Transactions"
@@ -160,8 +221,10 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
                       order={order}
                       isExpanded={expandedOrderId === order.id}
                       updatingOrderId={updatingOrderId}
+                      showAssignButton={activeTab === 'assign-rider'}
                       onAccept={handleAccept}
                       onDecline={handleDecline}
+                      onAssignRider={handleOpenAssignModal}
                       onToggleDetails={handleToggleDetails}
                       onGetDirections={handleGetDirections}
                     />
@@ -169,7 +232,7 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No {activeTab === 'incoming' ? 'incoming orders' : 'transactions'} found.
+                      No {activeTab === 'incoming' ? 'incoming orders' : activeTab === 'assign-rider' ? 'orders awaiting rider assignment' : 'transactions'} found.
                     </td>
                   </tr>
                 )}
@@ -184,6 +247,20 @@ export default function SellerOrders({ orders: initialOrders }: Props) {
           />
         </div>
       </div>
+
+      {/* Rider Assignment Modal */}
+      {selectedOrderForAssignment && (
+        <RiderAssignmentModal
+          order={selectedOrderForAssignment}
+          riders={riders}
+          isOpen={assignModalOpen}
+          onClose={() => {
+            setAssignModalOpen(false);
+            setSelectedOrderForAssignment(null);
+          }}
+          onAssign={handleAssignRider}
+        />
+      )}
     </DashboardLayout>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 import { 
   DollarSign, 
@@ -16,17 +16,8 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import { SimpleMapView } from './components/SimpleMapView';
 
-// Mock data
-const weeklyData = [
-  { day: 'Mon', earnings: 1250 },
-  { day: 'Tue', earnings: 1500 },
-  { day: 'Wed', earnings: 980 },
-  { day: 'Thu', earnings: 1780 },
-  { day: 'Fri', earnings: 2100 },
-  { day: 'Sat', earnings: 2500 },
-  { day: 'Sun', earnings: 1890 },
-];
 
 interface Order {
   id: number;
@@ -36,28 +27,27 @@ interface Order {
   total_amount: number;
   status: 'accepted' | 'in_transit' | 'delivered';
   items_count: number;
+  store_name: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
-const mockOrders: Order[] = [
-  {
-    id: 1001,
-    customer_name: 'Juan Dela Cruz',
-    delivery_address: '123 Main Street, Quezon City',
-    phone: '+63 912 345 6789',
-    total_amount: 15999,
-    status: 'accepted',
-    items_count: 1
-  },
-  {
-    id: 1002,
-    customer_name: 'Maria Santos',
-    delivery_address: '456 Rizal Avenue, Manila',
-    phone: '+63 923 456 7890',
-    total_amount: 2398,
-    status: 'in_transit',
-    items_count: 2
-  },
-];
+interface WeeklyData {
+  day: string;
+  earnings: number;
+}
+
+interface Stats {
+  todayEarnings: number;
+  completedTrips: number;
+  activeDeliveries: number;
+}
+
+interface Props {
+  stats: Stats;
+  weeklyData: WeeklyData[];
+  assignedOrders: Order[];
+}
 
 interface StatCardProps {
   title: string;
@@ -80,9 +70,10 @@ const StatCard = ({ title, value, icon }: StatCardProps) => (
 interface OrderCardProps {
   order: Order;
   onUpdateStatus: (orderId: number, status: Order['status']) => void;
+  isUpdating?: boolean;
 }
 
-const OrderCard = ({ order, onUpdateStatus }: OrderCardProps) => {
+const OrderCard = ({ order, onUpdateStatus, isUpdating }: OrderCardProps) => {
   const statusColors: Record<Order['status'], string> = {
     accepted: 'bg-primary/10 text-primary',
     in_transit: 'bg-yellow-100 text-yellow-800',
@@ -95,6 +86,7 @@ const OrderCard = ({ order, onUpdateStatus }: OrderCardProps) => {
         <div>
           <h3 className="text-lg font-bold text-gray-800">Order #{order.id}</h3>
           <p className="text-sm text-gray-600">{order.customer_name}</p>
+          <p className="text-xs text-gray-500 mt-1">{order.store_name}</p>
         </div>
         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusColors[order.status]}`}>
           {order.status.replace('_', ' ').toUpperCase()}
@@ -120,42 +112,65 @@ const OrderCard = ({ order, onUpdateStatus }: OrderCardProps) => {
         {order.status === 'accepted' && (
           <button
             onClick={() => onUpdateStatus(order.id, 'in_transit')}
-            className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            disabled={isUpdating}
+            className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Start Delivery
+            {isUpdating ? 'Starting...' : 'Start Delivery'}
           </button>
         )}
         {order.status === 'in_transit' && (
           <button
             onClick={() => onUpdateStatus(order.id, 'delivered')}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            disabled={isUpdating}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Mark as Delivered
+            {isUpdating ? 'Updating...' : 'Mark as Delivered'}
           </button>
         )}
-        <button className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors">
-          View Details
-        </button>
       </div>
     </div>
   );
 };
 
-export default function RiderDashboard() {
-  const [assignedOrders, setAssignedOrders] = useState<Order[]>(mockOrders);
+export default function RiderDashboard({ stats, weeklyData, assignedOrders: initialOrders }: Props) {
+  const [assignedOrders, setAssignedOrders] = useState<Order[]>(initialOrders);
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
 
-  const stats = [
-    { title: "Today's Earnings", value: "₱1,250.00", icon: <DollarSign size={20} /> },
-    { title: "Completed Trips", value: "15", icon: <CheckCircle size={20} /> },
-    { title: "Active Deliveries", value: assignedOrders.length, icon: <Package size={20} /> },
+  const statCards = [
+    { title: "Today's Earnings", value: `₱${stats.todayEarnings.toFixed(2)}`, icon: <DollarSign size={20} /> },
+    { title: "Completed Trips", value: stats.completedTrips, icon: <CheckCircle size={20} /> },
+    { title: "Active Deliveries", value: stats.activeDeliveries, icon: <Package size={20} /> },
   ];
 
-  const handleUpdateStatus = (orderId: number, status: Order['status']) => {
-    setAssignedOrders(orders => 
-      orders.map(order => 
-        order.id === orderId ? { ...order, status } : order
-      )
-    );
+  const handleUpdateStatus = async (orderId: number, status: Order['status']) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const endpoint = status === 'in_transit' 
+        ? `/rider/deliveries/${orderId}/start`
+        : `/rider/deliveries/${orderId}/delivered`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAssignedOrders(orders => 
+          orders.map(order => 
+            order.id === orderId ? { ...order, status } : order
+          ).filter(order => order.status !== 'delivered')
+        );
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    } finally {
+      setUpdatingOrderId(null);
+    }
   };
 
   return (
@@ -163,7 +178,7 @@ export default function RiderDashboard() {
       <div className="p-8 bg-gray-50 min-h-screen space-y-6">
         {/* Stat Cards */}
         <div className="grid grid-cols-3 gap-4 lg:gap-6">
-          {stats.map((stat, index) => (
+          {statCards.map((stat, index) => (
             <StatCard key={index} {...stat} />
           ))}
         </div>
@@ -200,8 +215,8 @@ export default function RiderDashboard() {
           </div>
           <div className="lg:col-span-2 h-80 lg:h-auto bg-white p-4 rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Live Orders Map</h2>
-            <div className="flex-grow min-h-0 bg-gray-100 rounded-lg flex items-center justify-center">
-              <p className="text-gray-500">Map placeholder</p>
+            <div className="flex-grow min-h-0">
+              <SimpleMapView orders={assignedOrders} />
             </div>
           </div>
         </div>
@@ -216,6 +231,7 @@ export default function RiderDashboard() {
                   key={order.id} 
                   order={order} 
                   onUpdateStatus={handleUpdateStatus}
+                  isUpdating={updatingOrderId === order.id}
                 />
               ))}
             </div>

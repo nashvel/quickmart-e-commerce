@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import { MapPin, Phone, Package, CheckCircle } from 'lucide-react';
+import { MapPin, Phone, Package, CheckCircle, Navigation, Loader2 } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -11,64 +11,41 @@ interface Order {
   status: 'accepted' | 'in_transit' | 'delivered';
   items_count: number;
   created_at: string;
+  store_name: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
-// Mock data
-const mockOrders: Order[] = [
-  {
-    id: 1001,
-    customer_name: 'Juan Dela Cruz',
-    delivery_address: '123 Main Street, Quezon City',
-    phone: '+63 912 345 6789',
-    total_amount: 15999,
-    status: 'accepted',
-    items_count: 1,
-    created_at: '2024-03-15T10:30:00'
-  },
-  {
-    id: 1002,
-    customer_name: 'Maria Santos',
-    delivery_address: '456 Rizal Avenue, Manila',
-    phone: '+63 923 456 7890',
-    total_amount: 2398,
-    status: 'in_transit',
-    items_count: 2,
-    created_at: '2024-03-15T14:45:00'
-  },
-  {
-    id: 1003,
-    customer_name: 'Jose Garcia',
-    delivery_address: '789 Bonifacio Street, Makati',
-    phone: '+63 934 567 8901',
-    total_amount: 45999,
-    status: 'delivered',
-    items_count: 1,
-    created_at: '2024-03-14T09:20:00'
-  },
-  {
-    id: 1004,
-    customer_name: 'Ana Lopez',
-    delivery_address: '321 Luna Street, Pasig',
-    phone: '+63 945 678 9012',
-    total_amount: 3299,
-    status: 'delivered',
-    items_count: 1,
-    created_at: '2024-03-14T11:00:00'
-  },
-];
+interface Props {
+  orders: Order[];
+}
+
+interface RiderLocation {
+  latitude: number;
+  longitude: number;
+}
 
 interface OrderCardProps {
   order: Order;
   onStartDelivery?: (orderId: number) => void;
   onMarkDelivered?: (orderId: number) => void;
+  onGetDirections?: (order: Order) => void;
+  isUpdating?: boolean;
+  riderLocation?: RiderLocation | null;
+  calculateDistance?: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
 }
 
-const OrderCard = ({ order, onStartDelivery, onMarkDelivered }: OrderCardProps) => {
+const OrderCard = ({ order, onStartDelivery, onMarkDelivered, onGetDirections, isUpdating, riderLocation, calculateDistance }: OrderCardProps) => {
   const statusColors: Record<Order['status'], string> = {
     accepted: 'bg-blue-100 text-blue-800',
     in_transit: 'bg-yellow-100 text-yellow-800',
     delivered: 'bg-green-100 text-green-800',
   };
+
+  // Calculate distance if both locations are available
+  const distance = riderLocation && order.latitude && order.longitude && calculateDistance
+    ? calculateDistance(riderLocation.latitude, riderLocation.longitude, order.latitude, order.longitude)
+    : null;
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
@@ -76,6 +53,7 @@ const OrderCard = ({ order, onStartDelivery, onMarkDelivered }: OrderCardProps) 
         <div>
           <h3 className="text-lg font-bold text-gray-800">Order #{order.id}</h3>
           <p className="text-sm text-gray-600">{order.customer_name}</p>
+          <p className="text-xs text-gray-500 mt-1">{order.store_name}</p>
         </div>
         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusColors[order.status]}`}>
           {order.status.replace('_', ' ').toUpperCase()}
@@ -95,48 +73,184 @@ const OrderCard = ({ order, onStartDelivery, onMarkDelivered }: OrderCardProps) 
           <Package size={16} className="flex-shrink-0" />
           <span>{order.items_count} item(s) - ₱{order.total_amount.toLocaleString()}</span>
         </div>
+        {distance !== null && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 font-semibold">
+            <Navigation size={16} className="flex-shrink-0" />
+            <span>{distance.toFixed(2)} km away</span>
+          </div>
+        )}
       </div>
 
-      {order.status === 'accepted' && onStartDelivery && (
-        <button
-          onClick={() => onStartDelivery(order.id)}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          Start Delivery
-        </button>
-      )}
-      {order.status === 'in_transit' && onMarkDelivered && (
-        <button
-          onClick={() => onMarkDelivered(order.id)}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          Mark as Delivered
-        </button>
-      )}
-      {order.status === 'delivered' && (
-        <div className="flex items-center justify-center gap-2 text-green-600 font-semibold">
-          <CheckCircle size={18} />
-          <span>Delivered</span>
-        </div>
-      )}
+      <div className="space-y-2">
+        {order.status === 'accepted' && onStartDelivery && (
+          <button
+            onClick={() => onStartDelivery(order.id)}
+            disabled={isUpdating}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? 'Starting...' : 'Start Delivery'}
+          </button>
+        )}
+        {order.status === 'in_transit' && onMarkDelivered && (
+          <button
+            onClick={() => onMarkDelivered(order.id)}
+            disabled={isUpdating}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? 'Updating...' : 'Mark as Delivered'}
+          </button>
+        )}
+        {order.status === 'delivered' && (
+          <div className="flex items-center justify-center gap-2 text-green-600 font-semibold">
+            <CheckCircle size={18} />
+            <span>Delivered</span>
+          </div>
+        )}
+        
+        {(order.status === 'accepted' || order.status === 'in_transit') && onGetDirections && (
+          <button
+            onClick={() => onGetDirections(order)}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <Navigation size={16} />
+            Get Directions
+          </button>
+        )}
+      </div>
     </div>
   );
 };
 
-export default function RiderDeliveries() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+export default function RiderDeliveries({ orders: initialOrders }: Props) {
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  const [riderLocation, setRiderLocation] = useState<RiderLocation | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
-  const handleStartDelivery = (orderId: number) => {
-    setOrders(orders.map(order => 
-      order.id === orderId ? { ...order, status: 'in_transit' as const } : order
-    ));
+  // Get rider's current location
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser');
+      setIsLoadingLocation(false);
+      return;
+    }
+
+    // Watch position for real-time updates
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setRiderLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        setIsLoadingLocation(false);
+        setLocationError(null);
+      },
+      (error) => {
+        setLocationError(error.message);
+        setIsLoadingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+
+    // Cleanup
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  const handleStartDelivery = async (orderId: number) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const response = await fetch(`/rider/deliveries/${orderId}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrders(orders.map(order => 
+          order.id === orderId ? { ...order, status: 'in_transit' as const } : order
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to start delivery:', error);
+    } finally {
+      setUpdatingOrderId(null);
+    }
   };
 
-  const handleMarkDelivered = (orderId: number) => {
-    setOrders(orders.map(order => 
-      order.id === orderId ? { ...order, status: 'delivered' as const } : order
-    ));
+  const handleMarkDelivered = async (orderId: number) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const response = await fetch(`/rider/deliveries/${orderId}/delivered`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrders(orders.map(order => 
+          order.id === orderId ? { ...order, status: 'delivered' as const } : order
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to mark as delivered:', error);
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const handleGetDirections = (order: Order) => {
+    if (!order.latitude || !order.longitude) {
+      // Fallback to address search if no coordinates
+      const query = encodeURIComponent(order.delivery_address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+      return;
+    }
+
+    if (riderLocation) {
+      // Open with directions from current location
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&origin=${riderLocation.latitude},${riderLocation.longitude}&destination=${order.latitude},${order.longitude}&travelmode=driving`,
+        '_blank'
+      );
+    } else {
+      // Just open the destination if location not available
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${order.latitude},${order.longitude}`,
+        '_blank'
+      );
+    }
+  };
+
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
   const activeOrders = orders.filter(o => o.status === 'accepted' || o.status === 'in_transit');
@@ -147,7 +261,29 @@ export default function RiderDeliveries() {
   return (
     <DashboardLayout role="rider">
       <div className="p-8 bg-gray-50 min-h-screen">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">My Deliveries</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">My Deliveries</h1>
+          
+          {/* Location Status */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm">
+            {isLoadingLocation ? (
+              <>
+                <Loader2 className="animate-spin text-blue-600" size={16} />
+                <span className="text-sm text-gray-600">Getting location...</span>
+              </>
+            ) : locationError ? (
+              <>
+                <MapPin className="text-red-500" size={16} />
+                <span className="text-sm text-red-600">Location unavailable</span>
+              </>
+            ) : riderLocation ? (
+              <>
+                <Navigation className="text-green-600" size={16} />
+                <span className="text-sm text-green-600">Location active</span>
+              </>
+            ) : null}
+          </div>
+        </div>
 
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
@@ -184,6 +320,10 @@ export default function RiderDeliveries() {
                 order={order}
                 onStartDelivery={activeTab === 'active' ? handleStartDelivery : undefined}
                 onMarkDelivered={activeTab === 'active' ? handleMarkDelivered : undefined}
+                onGetDirections={handleGetDirections}
+                isUpdating={updatingOrderId === order.id}
+                riderLocation={riderLocation}
+                calculateDistance={calculateDistance}
               />
             ))}
           </div>

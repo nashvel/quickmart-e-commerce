@@ -8,8 +8,10 @@ interface OrderRowProps {
   order: Order;
   isExpanded: boolean;
   updatingOrderId: number | null;
+  showAssignButton?: boolean;
   onAccept: (orderId: number) => void;
   onDecline: (orderId: number) => void;
+  onAssignRider?: (order: Order) => void;
   onToggleDetails: (orderId: number) => void;
   onGetDirections: (order: Order) => void;
 }
@@ -18,8 +20,10 @@ export const OrderRow: React.FC<OrderRowProps> = ({
   order,
   isExpanded,
   updatingOrderId,
+  showAssignButton = false,
   onAccept,
   onDecline,
+  onAssignRider,
   onToggleDetails,
   onGetDirections
 }) => {
@@ -48,8 +52,10 @@ export const OrderRow: React.FC<OrderRowProps> = ({
             order={order}
             isExpanded={isExpanded}
             updatingOrderId={updatingOrderId}
+            showAssignButton={showAssignButton}
             onAccept={onAccept}
             onDecline={onDecline}
+            onAssignRider={onAssignRider}
             onToggleDetails={onToggleDetails}
           />
         </td>

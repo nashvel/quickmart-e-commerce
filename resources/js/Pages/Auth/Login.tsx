@@ -107,6 +107,39 @@ export default function Login() {
                             Sign in to your account
                         </h2>
                     </div>
+
+                    {/* Test Credentials Section */}
+                    <details className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <summary className="cursor-pointer font-semibold text-blue-900 text-sm">
+                             Test Credentials (Development Only)
+                        </summary>
+                        <div className="mt-3 space-y-3 text-xs">
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                                <p className="font-semibold text-gray-700 mb-1">Customer</p>
+                                <p className="text-gray-600">Email: customer@example.com</p>
+                                <p className="text-gray-600">Password: password</p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                                <p className="font-semibold text-gray-700 mb-1">Sellers</p>
+                                <p className="text-gray-600">tech@example.com / password</p>
+                                <p className="text-gray-600">fashion@example.com / password</p>
+                                <p className="text-gray-600">home@example.com / password</p>
+                                <p className="text-gray-600">pizza@example.com / password</p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                                <p className="font-semibold text-gray-700 mb-1">Riders</p>
+                                <p className="text-gray-600">rider1@example.com / password</p>
+                                <p className="text-gray-600">rider2@example.com / password</p>
+                                <p className="text-gray-600">rider3@example.com / password</p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                                <p className="font-semibold text-gray-700 mb-1">Admin</p>
+                                <p className="text-gray-600">Email: admin@example.com</p>
+                                <p className="text-gray-600">Password: password</p>
+                            </div>
+                        </div>
+                    </details>
+
                     <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                         <div className="rounded-md shadow-sm -space-y-px">
                             <div>

@@ -30,7 +30,7 @@ class SellerController extends Controller
         $stores = Store::where('client_id', $userId)->pluck('id');
         
         // Get orders for the seller's stores
-        $orders = Order::with(['customer', 'items.product', 'address'])
+        $orders = Order::with(['customer', 'items.product', 'address', 'rider'])
             ->whereIn('store_id', $stores)
             ->orderBy('created_at', 'desc')
             ->get()
@@ -51,8 +51,9 @@ class SellerController extends Controller
                     'zip_code' => $order->address ? $order->address->postal_code : 'N/A',
                     'latitude' => $order->address ? $order->address->latitude : null,
                     'longitude' => $order->address ? $order->address->longitude : null,
-                    'rider_first_name' => null, // Add rider data if available
-                    'rider_last_name' => null,
+                    'rider_id' => $order->rider_id,
+                    'rider_first_name' => $order->rider ? $order->rider->first_name : null,
+                    'rider_last_name' => $order->rider ? $order->rider->last_name : null,
                     'items' => $order->items->map(function ($item) {
                         return [
                             'product_name' => $item->product ? $item->product->name : 'Unknown Product',
@@ -63,9 +64,16 @@ class SellerController extends Controller
                     }),
                 ];
             });
+        
+        // Get available riders
+        $riders = \App\Models\User::where('role', 'rider')
+            ->where('is_verified', true)
+            ->select('id', 'first_name', 'last_name', 'email')
+            ->get();
 
         return Inertia::render('Seller/Orders/Index', [
-            'orders' => $orders
+            'orders' => $orders,
+            'riders' => $riders
         ]);
     }
 
@@ -166,6 +174,53 @@ class SellerController extends Controller
             'success' => true,
             'message' => 'Order declined',
             'order' => $order
+        ]);
+    }
+    
+    /**
+     * Assign rider to an order
+     */
+    public function assignRider(Request $request, Order $order)
+    {
+        $userId = Auth::id();
+        
+        // Verify seller owns the store
+        $store = Store::where('client_id', $userId)
+            ->where('id', $order->store_id)
+            ->first();
+        
+        if (!$store) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        // Validate request
+        $request->validate([
+            'rider_id' => 'required|exists:users,id'
+        ]);
+        
+        // Verify rider role
+        $rider = \App\Models\User::where('id', $request->rider_id)
+            ->where('role', 'rider')
+            ->first();
+        
+        if (!$rider) {
+            return response()->json(['message' => 'Invalid rider'], 400);
+        }
+        
+        // Only assign riders to accepted orders
+        if ($order->status !== 'accepted') {
+            return response()->json(['message' => 'Order must be accepted first'], 400);
+        }
+        
+        $order->update([
+            'rider_id' => $request->rider_id,
+            'status' => 'in_transit'
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Rider assigned successfully',
+            'order' => $order->load('rider')
         ]);
     }
 }

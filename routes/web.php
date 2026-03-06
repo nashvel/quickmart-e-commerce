@@ -186,6 +186,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/orders', [\App\Http\Controllers\Seller\SellerController::class, 'orders'])->name('orders');
         Route::post('/orders/{order}/accept', [\App\Http\Controllers\Seller\SellerController::class, 'acceptOrder'])->name('orders.accept');
         Route::post('/orders/{order}/decline', [\App\Http\Controllers\Seller\SellerController::class, 'declineOrder'])->name('orders.decline');
+        Route::post('/orders/{order}/assign-rider', [\App\Http\Controllers\Seller\SellerController::class, 'assignRider'])->name('orders.assign-rider');
         
         Route::get('/reviews', function () {
             return Inertia::render('Seller/Reviews');
@@ -210,17 +211,11 @@ Route::middleware('auth')->group(function () {
     
     // Rider Routes
     Route::prefix('rider')->name('rider.')->middleware(['auth', 'rider'])->group(function () {
-        Route::get('/dashboard', function () {
-            return Inertia::render('Rider/Dashboard');
-        })->name('dashboard');
-        
-        Route::get('/deliveries', function () {
-            return Inertia::render('Rider/Deliveries');
-        })->name('deliveries');
-        
-        Route::get('/earnings', function () {
-            return Inertia::render('Rider/Earnings');
-        })->name('earnings');
+        Route::get('/dashboard', [\App\Http\Controllers\Rider\RiderController::class, 'dashboard'])->name('dashboard');
+        Route::get('/deliveries', [\App\Http\Controllers\Rider\RiderController::class, 'deliveries'])->name('deliveries');
+        Route::post('/deliveries/{order}/start', [\App\Http\Controllers\Rider\RiderController::class, 'startDelivery'])->name('deliveries.start');
+        Route::post('/deliveries/{order}/delivered', [\App\Http\Controllers\Rider\RiderController::class, 'markDelivered'])->name('deliveries.delivered');
+        Route::get('/earnings', [\App\Http\Controllers\Rider\RiderController::class, 'earnings'])->name('earnings');
     });
 });
 
